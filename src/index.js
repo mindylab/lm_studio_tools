@@ -1,0 +1,370 @@
+#!/usr/bin/env node
+
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import * as z from 'zod/v4';
+import {
+  DEFAULT_MAX_CONTENT_CHARS,
+  ENABLE_JINA_FALLBACK,
+  captureWebPageToImages,
+  fetchWebPage,
+  searchAndFetch,
+  searchWeb,
+} from './web.js';
+
+const server = new McpServer({
+  name: 'local-web-mcp',
+  version: '0.1.0',
+});
+
+const searchResultSchema = z.object({
+  index: z.number(),
+  title: z.string(),
+  url: z.string(),
+  snippet: z.string(),
+  publishedAt: z.string().nullable(),
+});
+
+const pageSchema = z.object({
+  url: z.string(),
+  finalUrl: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  publishedTime: z.string().nullable(),
+  contentType: z.string().nullable(),
+  sourceMethod: z.string(),
+  truncated: z.boolean(),
+  text: z.string(),
+  warning: z.string().nullable().optional(),
+});
+
+const screenshotImageSchema = z.object({
+  index: z.number(),
+  mimeType: z.string(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+  pageX: z.number(),
+  pageY: z.number(),
+  pageWidth: z.number(),
+  pageHeight: z.number(),
+  sizeBytes: z.number(),
+});
+
+const pageScreenshotsSchema = z.object({
+  url: z.string(),
+  finalUrl: z.string(),
+  title: z.string(),
+  viewportWidth: z.number(),
+  viewportHeight: z.number(),
+  fullPage: z.boolean(),
+  pageWidth: z.number(),
+  pageHeight: z.number(),
+  capturedHeight: z.number(),
+  format: z.string(),
+  images: z.array(screenshotImageSchema),
+  warning: z.string().nullable().optional(),
+});
+
+server.registerTool(
+  'web_search',
+  {
+    title: 'Web Search',
+    description:
+      'Search the web and return result titles, URLs, snippets, and publish dates when available. Use this before opening full pages.',
+    inputSchema: {
+      query: z.string().min(1).describe('The search query to run.'),
+      count: z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .optional()
+        .describe('How many search results to return. Default: 5.'),
+      site: z.string().optional().describe('Optional domain filter such as "docs.python.org".'),
+      countryCode: z
+        .string()
+        .min(2)
+        .max(5)
+        .optional()
+        .describe('Search market like "us", "gb", or "de". Default: "us".'),
+      language: z
+        .string()
+        .optional()
+        .describe('Language hint like "en-US". Default: "en-US".'),
+    },
+    outputSchema: {
+      query: z.string(),
+      fullQuery: z.string(),
+      backend: z.string(),
+      market: z.object({
+        countryCode: z.string(),
+        language: z.string(),
+      }),
+      results: z.array(searchResultSchema),
+    },
+  },
+  wrapTool(async (args) => {
+    const result = await searchWeb(args);
+    return {
+      content: [{ type: 'text', text: result.text }],
+      structuredContent: {
+        query: result.query,
+        fullQuery: result.fullQuery,
+        backend: result.backend,
+        market: result.market,
+        results: result.results,
+      },
+    };
+  }),
+);
+
+server.registerTool(
+  'web_fetch',
+  {
+    title: 'Web Fetch',
+    description:
+      'Download a single web page and return readable text content. Works for normal web pages and can fall back to a reader service for hard-to-parse pages.',
+    inputSchema: {
+      url: z.string().url().describe('The page URL to fetch.'),
+      maxChars: z.coerce
+        .number()
+        .int()
+        .min(1_000)
+        .max(30_000)
+        .optional()
+        .describe(`Maximum characters of page text to return. Default: ${DEFAULT_MAX_CONTENT_CHARS}.`),
+      preferReader: z
+        .boolean()
+        .optional()
+        .describe(
+          `Whether to use the reader fallback when direct extraction is weak or blocked. Default: true. Current server fallback enabled: ${ENABLE_JINA_FALLBACK}.`,
+        ),
+    },
+    outputSchema: pageSchema.shape,
+  },
+  wrapTool(async (args) => {
+    const page = await fetchWebPage(args);
+    const content = [
+      `Title: ${page.title}`,
+      `URL: ${page.finalUrl}`,
+      page.description ? `Description: ${page.description}` : null,
+      page.publishedTime ? `Published: ${page.publishedTime}` : null,
+      `Method: ${page.sourceMethod}`,
+      page.warning ? `Warning: ${page.warning}` : null,
+      '',
+      page.text,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    return {
+      content: [{ type: 'text', text: content }],
+      structuredContent: page,
+    };
+  }),
+);
+
+server.registerTool(
+  'web_page_to_images',
+  {
+    title: 'Web Page To Images',
+    description:
+      'Load a web page in a browser and capture the rendered page as screenshot image content. Tall full-page captures are split into multiple images.',
+    inputSchema: {
+      url: z.string().url().describe('The page URL to render and capture.'),
+      viewportWidth: z.coerce
+        .number()
+        .int()
+        .min(320)
+        .max(3840)
+        .optional()
+        .describe('Browser viewport width in CSS pixels. Default: 1280.'),
+      viewportHeight: z.coerce
+        .number()
+        .int()
+        .min(320)
+        .max(2160)
+        .optional()
+        .describe('Browser viewport height in CSS pixels. Default: 900.'),
+      fullPage: z
+        .boolean()
+        .optional()
+        .describe('Whether to capture the full scrollable page. Default: true.'),
+      waitUntil: z
+        .enum(['domcontentloaded', 'load', 'networkidle'])
+        .optional()
+        .describe('Page load state to wait for before capture. Default: networkidle.'),
+      waitAfterLoadMs: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(10_000)
+        .optional()
+        .describe('Extra wait after the selected load state, in milliseconds. Default: 1000.'),
+      scrollToLoad: z
+        .boolean()
+        .optional()
+        .describe('Whether to scroll through the page first to trigger lazy loading. Default: true.'),
+      segmentHeight: z.coerce
+        .number()
+        .int()
+        .min(1_000)
+        .max(16_000)
+        .optional()
+        .describe('Maximum CSS-pixel height per returned screenshot image. Default: 10000.'),
+      maxPageHeight: z.coerce
+        .number()
+        .int()
+        .min(1_000)
+        .max(100_000)
+        .optional()
+        .describe('Maximum full-page CSS-pixel height to capture. Default: 50000.'),
+      format: z
+        .enum(['png', 'jpeg'])
+        .optional()
+        .describe('Screenshot image format. Default: png.'),
+      jpegQuality: z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('JPEG quality when format is jpeg. Default: 90.'),
+    },
+    outputSchema: pageScreenshotsSchema.shape,
+  },
+  wrapTool(async (args) => {
+    const result = await captureWebPageToImages(args);
+    return {
+      content: [
+        { type: 'text', text: result.text },
+        ...result.images.map((image) => ({
+          type: 'image',
+          data: image.data,
+          mimeType: image.mimeType,
+        })),
+      ],
+      structuredContent: {
+        url: result.url,
+        finalUrl: result.finalUrl,
+        title: result.title,
+        viewportWidth: result.viewportWidth,
+        viewportHeight: result.viewportHeight,
+        fullPage: result.fullPage,
+        pageWidth: result.pageWidth,
+        pageHeight: result.pageHeight,
+        capturedHeight: result.capturedHeight,
+        format: result.format,
+        images: result.images.map(({ data, ...image }) => image),
+        warning: result.warning,
+      },
+    };
+  }),
+);
+
+server.registerTool(
+  'web_search_and_fetch',
+  {
+    title: 'Web Search And Fetch',
+    description:
+      'Search the web and then open the top results in one call. Useful when the model needs a quick research pass without multiple tool calls.',
+    inputSchema: {
+      query: z.string().min(1).describe('The search query to run.'),
+      count: z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .optional()
+        .describe('How many search results to collect. Default: 5.'),
+      openTop: z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(3)
+        .optional()
+        .describe('How many of the top results to open and read. Default: 3.'),
+      maxCharsPerPage: z.coerce
+        .number()
+        .int()
+        .min(1_000)
+        .max(20_000)
+        .optional()
+        .describe('Maximum page text to return per opened result.'),
+      site: z.string().optional().describe('Optional domain filter such as "developer.mozilla.org".'),
+      countryCode: z
+        .string()
+        .min(2)
+        .max(5)
+        .optional()
+        .describe('Search market like "us", "gb", or "de". Default: "us".'),
+      language: z
+        .string()
+        .optional()
+        .describe('Language hint like "en-US". Default: "en-US".'),
+    },
+    outputSchema: {
+      query: z.string(),
+      fullQuery: z.string(),
+      backend: z.string(),
+      market: z.object({
+        countryCode: z.string(),
+        language: z.string(),
+      }),
+      results: z.array(searchResultSchema),
+      pages: z.array(pageSchema),
+    },
+  },
+  wrapTool(async (args) => {
+    const result = await searchAndFetch(args);
+    return {
+      content: [{ type: 'text', text: result.text }],
+      structuredContent: {
+        query: result.query,
+        fullQuery: result.fullQuery,
+        backend: result.backend,
+        market: result.market,
+        results: result.results,
+        pages: result.pages,
+      },
+    };
+  }),
+);
+
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  if (process.env.LM_WEB_MCP_DEBUG === '1') {
+    console.error('local-web-mcp is running on stdio');
+  }
+}
+
+function wrapTool(handler) {
+  return async (args) => {
+    try {
+      return await handler(args);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      console.error('Tool error:', message);
+      return {
+        isError: true,
+        content: [{ type: 'text', text: `Error: ${message}` }],
+      };
+    }
+  };
+}
+
+process.on('unhandledRejection', (error) => {
+  console.error('Unhandled rejection:', error);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error);
+  process.exit(1);
+});
+
+main().catch((error) => {
+  console.error('Server error:', error);
+  process.exit(1);
+});

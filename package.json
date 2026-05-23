@@ -1,0 +1,36 @@
+{
+  "name": "local-web-mcp",
+  "version": "0.1.0",
+  "description": "A standalone local-web MCP server for LM Studio with web search, page fetch, and rendered page screenshot tools.",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "local-web-mcp": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "mcp:config": "node src/config-snippet.js",
+    "browsers:install": "playwright install chromium",
+    "check": "node --check src/index.js && node --check src/web.js && node --check src/config-snippet.js"
+  },
+  "keywords": [
+    "local-web",
+    "lm-studio",
+    "mcp",
+    "model-context-protocol",
+    "web-search",
+    "screenshots",
+    "internet"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@mozilla/readability": "^0.6.0",
+    "cheerio": "^1.2.0",
+    "fast-xml-parser": "^5.3.2",
+    "html-to-text": "^9.0.5",
+    "jsdom": "^29.0.2",
+    "playwright": "^1.56.1",
+    "zod": "^4.3.6"
+  }
+}

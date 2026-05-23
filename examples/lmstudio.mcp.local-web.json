@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "local-web": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/simple_web_tool/src/index.js"
+      ],
+      "timeout": 60000
+    }
+  }
+}
