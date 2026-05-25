@@ -7,13 +7,14 @@ It runs as a local MCP server over stdio.
 
 - `web_search`: search the web and return titles, URLs, snippets, and publish dates when available.
 - `web_fetch`: fetch one URL and extract readable text.
+- `youtube_transcript`: extract a YouTube transcript from a URL or video id without launching a browser.
 - `web_page_to_images`: render one URL in Chromium and return full-page screenshot image(s).
 - `web_search_and_fetch`: search, then fetch the top results in one call.
 
 ## Requirements
 
 - Node.js 20.19 or newer.
-- Network access for Brave Search, Bing RSS fallback, target web pages, and optional `r.jina.ai` reader fallback.
+- Network access for Brave Search, Bing RSS fallback, YouTube transcript requests, target web pages, and optional `r.jina.ai` reader fallback.
 
 ## Install
 
@@ -189,6 +190,18 @@ If Chromium fails to launch on Linux because system libraries are missing, run:
 
 ```bash
 npx playwright install --with-deps chromium
+```
+
+On some Linux ARM systems, GPU/Vulkan drivers can make Chromium log errors like
+`failed to open device /dev/dri/renderD128`. The screenshot tool launches its own headless Chromium
+with GPU and sandbox disabled by default so browser capture does not touch the GPU path. Keep LM
+Studio itself configured for your normal model-inference GPU backend.
+
+If the terminal prints `[1]+ Stopped`, the app was suspended by the shell, usually from `Ctrl+Z`.
+Resume it with:
+
+```bash
+fg
 ```
 
 ## Troubleshooting
