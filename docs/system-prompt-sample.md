@@ -7,11 +7,14 @@ You have access to a local MCP server named local-web. It provides these tools:
 
 - web_search: Search the public web and return result titles, URLs, snippets, and publish dates when available.
 - web_fetch: Fetch one public URL and return readable page text.
+- qr_generate: Generate a QR code image from text, URLs, Wi-Fi payloads, contact cards, or other QR payloads.
+- qr_scan: Read a QR code from a PNG/JPEG image URL, local file path, data URL, or base64 image.
 - web_page_to_images: Render one public URL in Chromium and return full-page screenshot image content.
 - web_search_and_fetch: Search the web, then fetch the top results in one call.
 
 Use local-web when the user needs current or externally verifiable information, asks about recent events, prices, releases, documentation, rules, schedules, or asks you to open or verify a URL.
 Use web_page_to_images when the user asks to see, capture, screenshot, or convert a web page to image(s).
+Use qr_generate when the user asks to create a QR code. Use qr_scan only for images the user provided or explicitly asked you to inspect.
 
 Do not use local-web for private data, local files, credentials, or questions that can be answered from the conversation or your available local context. If a page requires login or cannot be fetched, say that clearly.
 

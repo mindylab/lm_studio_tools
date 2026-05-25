@@ -8,6 +8,8 @@ It runs as a local MCP server over stdio.
 - `web_search`: search the web and return titles, URLs, snippets, and publish dates when available.
 - `web_fetch`: fetch one URL and extract readable text.
 - `youtube_transcript`: extract a YouTube transcript from a URL or video id without launching a browser.
+- `qr_generate`: generate a QR code PNG image from text, URLs, Wi-Fi payloads, or contact cards.
+- `qr_scan`: scan a QR code from a PNG/JPEG image URL, local file path, data URL, or base64 image.
 - `web_page_to_images`: render one URL in Chromium and return full-page screenshot image(s).
 - `web_search_and_fetch`: search, then fetch the top results in one call.
 
@@ -151,6 +153,9 @@ Set these environment variables before LM Studio starts the MCP server if you wa
 | `LM_WEB_MCP_FETCH_TIMEOUT_MS` | `20000` | Per-request fetch timeout in milliseconds. |
 | `LM_WEB_MCP_DEFAULT_MAX_CONTENT_CHARS` | `12000` | Default maximum page text returned by `web_fetch`. |
 | `LM_WEB_MCP_MAX_DOWNLOAD_BYTES` | `5000000` | Maximum response size the server will download. |
+| `LM_WEB_MCP_DEFAULT_QR_WIDTH` | `768` | Default generated QR PNG width and height in pixels. |
+| `LM_WEB_MCP_MAX_QR_TEXT_CHARS` | `4000` | Maximum text length accepted by `qr_generate`. |
+| `LM_WEB_MCP_MAX_QR_IMAGE_BYTES` | `10000000` | Maximum PNG/JPEG image size accepted by `qr_scan`. |
 | `LM_WEB_MCP_SEARCH_COUNTRY_CODE` | `us` | Default search country, such as `us`, `gb`, or `de`. |
 | `LM_WEB_MCP_SEARCH_LANGUAGE` | `en-US` | Default search language hint. |
 | `LM_WEB_MCP_ENABLE_JINA_FALLBACK` | `1` | Set to `0` to disable `r.jina.ai` reader fallback. |
@@ -173,6 +178,19 @@ npm start
 ```
 
 The server uses stdio, so it will wait for an MCP client and may look quiet in the terminal.
+
+## QR Tools
+
+`qr_generate` returns both text metadata and PNG image content, so chat clients can display the QR code directly.
+The `text` input can be a URL, Wi-Fi payload, contact card, payment URI, or any normal QR payload.
+
+`qr_scan` reads PNG and JPEG images from:
+
+- `imageUrl`
+- `imagePath`
+- `imageBase64`
+
+Provide exactly one image source. For local files, only scan paths the user provided or explicitly asked to inspect.
 
 ## Page Screenshots
 

@@ -4,6 +4,10 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import * as z from 'zod/v4';
 import {
+  generateQrCode,
+  scanQrCode,
+} from './qr.js';
+import {
   DEFAULT_MAX_CONTENT_CHARS,
   ENABLE_JINA_FALLBACK,
   captureWebPageToImages,
@@ -79,6 +83,38 @@ const youtubeTranscriptSchema = z.object({
   text: z.string(),
 });
 
+const qrGenerateSchema = z.object({
+  text: z.string(),
+  mimeType: z.string(),
+  imageBase64: z.string(),
+  width: z.number(),
+  height: z.number(),
+  sizeBytes: z.number(),
+  errorCorrectionLevel: z.string(),
+  margin: z.number(),
+});
+
+const qrScanLocationPointSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+
+const qrScanSchema = z.object({
+  text: z.string(),
+  source: z.string(),
+  mimeType: z.string(),
+  width: z.number(),
+  height: z.number(),
+  location: z
+    .object({
+      topLeft: qrScanLocationPointSchema,
+      topRight: qrScanLocationPointSchema,
+      bottomRight: qrScanLocationPointSchema,
+      bottomLeft: qrScanLocationPointSchema,
+    })
+    .nullable(),
+});
+
 server.registerTool(
   'web_search',
   {
@@ -128,6 +164,115 @@ server.registerTool(
         market: result.market,
         results: result.results,
       },
+    };
+  }),
+);
+
+server.registerTool(
+  'qr_generate',
+  {
+    title: 'QR Generate',
+    description:
+      'Generate a QR code PNG image from text, a URL, Wi-Fi config, contact card, or any other QR payload. Returns image content that clients can display in chat.',
+    inputSchema: {
+      text: z
+        .string()
+        .min(1)
+        .max(4_000)
+        .describe('Text or payload to encode into the QR code.'),
+      errorCorrectionLevel: z
+        .enum(['L', 'M', 'Q', 'H'])
+        .optional()
+        .describe('QR error correction level. Higher levels survive more damage but make denser codes. Default: M.'),
+      margin: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(16)
+        .optional()
+        .describe('Quiet-zone margin around the QR code modules. Default: 4.'),
+      width: z.coerce
+        .number()
+        .int()
+        .min(128)
+        .max(2_048)
+        .optional()
+        .describe('PNG image width and height in pixels. Default: 768.'),
+      darkColor: z
+        .string()
+        .optional()
+        .describe('Dark module color as #RRGGBB or #RRGGBBAA. Default: black.'),
+      lightColor: z
+        .string()
+        .optional()
+        .describe('Light background color as #RRGGBB or #RRGGBBAA. Default: white.'),
+    },
+    outputSchema: qrGenerateSchema.shape,
+  },
+  wrapTool(async (args) => {
+    const qr = await generateQrCode(args);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Generated QR code image (${qr.width}x${qr.height}, ${qr.sizeBytes} bytes).`,
+        },
+        {
+          type: 'image',
+          data: qr.data,
+          mimeType: qr.mimeType,
+        },
+      ],
+      structuredContent: {
+        text: qr.text,
+        mimeType: qr.mimeType,
+        imageBase64: qr.data,
+        width: qr.width,
+        height: qr.height,
+        sizeBytes: qr.sizeBytes,
+        errorCorrectionLevel: qr.errorCorrectionLevel,
+        margin: qr.margin,
+      },
+    };
+  }),
+);
+
+server.registerTool(
+  'qr_scan',
+  {
+    title: 'QR Scan',
+    description:
+      'Read a QR code from a PNG or JPEG image URL, local file path, data URL, or base64 image. Use only with images the user provided or explicitly asked to inspect.',
+    inputSchema: {
+      imageUrl: z
+        .string()
+        .optional()
+        .describe('HTTP/HTTPS image URL or data:image/...;base64 URL containing a QR code.'),
+      imagePath: z
+        .string()
+        .optional()
+        .describe('Local PNG/JPEG file path containing a QR code. Use only when the user provides the path.'),
+      imageBase64: z
+        .string()
+        .optional()
+        .describe('Raw base64 image bytes, or a data:image/...;base64 URL.'),
+      mimeType: z
+        .string()
+        .optional()
+        .describe('Optional image MIME type when passing raw base64. Supported: image/png, image/jpeg.'),
+    },
+    outputSchema: qrScanSchema.shape,
+  },
+  wrapTool(async (args) => {
+    const result = await scanQrCode(args);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `QR code text:\n${result.text}`,
+        },
+      ],
+      structuredContent: result,
     };
   }),
 );
