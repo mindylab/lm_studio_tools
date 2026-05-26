@@ -7,7 +7,7 @@ It runs as a local MCP server over stdio.
 
 - `web_search`: search the web and return titles, URLs, snippets, and publish dates when available.
 - `web_fetch`: fetch one URL and extract readable text.
-- `youtube_transcript`: extract a YouTube transcript from a URL or video id without launching a browser.
+- `youtube_transcript`: extract a YouTube transcript from a URL or video id without launching a browser, including the video cover image URL.
 - `qr_generate`: generate a QR code PNG image from text, URLs, Wi-Fi payloads, or contact cards.
 - `qr_scan`: scan a QR code from a PNG/JPEG image URL, local file path, data URL, or base64 image.
 - `web_page_to_images`: render one URL in Chromium and return full-page screenshot image(s).
@@ -156,6 +156,9 @@ Set these environment variables before LM Studio starts the MCP server if you wa
 | `LM_WEB_MCP_DEFAULT_QR_WIDTH` | `768` | Default generated QR PNG width and height in pixels. |
 | `LM_WEB_MCP_MAX_QR_TEXT_CHARS` | `4000` | Maximum text length accepted by `qr_generate`. |
 | `LM_WEB_MCP_MAX_QR_IMAGE_BYTES` | `10000000` | Maximum PNG/JPEG image size accepted by `qr_scan`. |
+| `LM_WEB_MCP_ASSET_PORT` | `8765` | Local HTTP port used to expose generated screenshots/QR images to chat clients when LM Studio cannot persist MCP image files. |
+| `LM_WEB_MCP_PUBLIC_BASE_URL` | auto LAN URL | Optional public base URL for generated image links, for example `http://192.168.9.211:8765`. |
+| `LM_WEB_MCP_DISABLE_ASSET_SERVER` | unset | Set to `1` to disable the generated-image asset server. |
 | `LM_WEB_MCP_SEARCH_COUNTRY_CODE` | `us` | Default search country, such as `us`, `gb`, or `de`. |
 | `LM_WEB_MCP_SEARCH_LANGUAGE` | `en-US` | Default search language hint. |
 | `LM_WEB_MCP_ENABLE_JINA_FALLBACK` | `1` | Set to `0` to disable `r.jina.ai` reader fallback. |
@@ -204,6 +207,7 @@ By default it:
 - Splits very tall pages into multiple images.
 
 Useful options include `viewportWidth`, `viewportHeight`, `format`, `segmentHeight`, and `maxPageHeight`.
+Full-page capture is forced by default; use `viewportOnly: true` only when you explicitly want just the top/current visible viewport.
 If Chromium fails to launch on Linux because system libraries are missing, run:
 
 ```bash
