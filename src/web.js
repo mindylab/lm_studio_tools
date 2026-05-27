@@ -13,6 +13,14 @@ const DEFAULT_MAX_CONTENT_CHARS = parseInteger(
   process.env.LM_WEB_MCP_DEFAULT_MAX_CONTENT_CHARS,
   12_000,
 );
+const MAX_YOUTUBE_TRANSCRIPT_CHARS = Math.max(
+  1_000,
+  parseInteger(process.env.LM_WEB_MCP_MAX_YOUTUBE_TRANSCRIPT_CHARS, 1_000_000),
+);
+const DEFAULT_MAX_TRANSCRIPT_CHARS = parseInteger(
+  process.env.LM_WEB_MCP_DEFAULT_MAX_TRANSCRIPT_CHARS,
+  0,
+);
 const MAX_DOWNLOAD_BYTES = parseInteger(
   process.env.LM_WEB_MCP_MAX_DOWNLOAD_BYTES,
   5_000_000,
@@ -46,7 +54,9 @@ const CONTENT_SELECTORS = [
 
 export {
   DEFAULT_MAX_CONTENT_CHARS,
+  DEFAULT_MAX_TRANSCRIPT_CHARS,
   ENABLE_JINA_FALLBACK,
+  MAX_YOUTUBE_TRANSCRIPT_CHARS,
 };
 
 export async function searchWeb({
@@ -135,10 +145,10 @@ export async function fetchYouTubeTranscript({
   videoId,
   language,
   includeTimestamps = true,
-  maxChars = DEFAULT_MAX_CONTENT_CHARS,
+  maxChars = DEFAULT_MAX_TRANSCRIPT_CHARS,
 }) {
   const id = normalizeYouTubeVideoId(videoId || extractYouTubeVideoId(url));
-  const limitedChars = clamp(maxChars, 1_000, 30_000);
+  const limitedChars = normalizeYouTubeTranscriptMaxChars(maxChars);
   const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}&hl=en`;
   const { text: watchHtml } = await fetchText(watchUrl, {
     accept: 'text/html,application/xhtml+xml,*/*;q=0.8',
@@ -1161,6 +1171,15 @@ function truncateText(text, maxChars) {
   }
 
   return `${text.slice(0, maxChars).trimEnd()}\n\n[truncated]`;
+}
+
+function normalizeYouTubeTranscriptMaxChars(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return clamp(numeric, 1_000, MAX_YOUTUBE_TRANSCRIPT_CHARS);
 }
 
 function normalizeText(text) {

@@ -12,7 +12,9 @@ import {
 } from './qr.js';
 import {
   DEFAULT_MAX_CONTENT_CHARS,
+  DEFAULT_MAX_TRANSCRIPT_CHARS,
   ENABLE_JINA_FALLBACK,
+  MAX_YOUTUBE_TRANSCRIPT_CHARS,
   captureWebPageToImages,
   fetchWebPage,
   fetchYouTubeTranscript,
@@ -326,10 +328,14 @@ server.registerTool(
       maxChars: z.coerce
         .number()
         .int()
-        .min(1_000)
-        .max(30_000)
+        .min(0)
+        .max(MAX_YOUTUBE_TRANSCRIPT_CHARS)
         .optional()
-        .describe(`Maximum transcript characters to return. Default: ${DEFAULT_MAX_CONTENT_CHARS}.`),
+        .describe(
+          `Maximum transcript characters to return. Use 0 for the full transcript. Default: ${
+            DEFAULT_MAX_TRANSCRIPT_CHARS <= 0 ? 'full transcript' : DEFAULT_MAX_TRANSCRIPT_CHARS
+          }.`,
+        ),
     },
     outputSchema: youtubeTranscriptSchema.shape,
   },

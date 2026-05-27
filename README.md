@@ -152,6 +152,8 @@ Set these environment variables before LM Studio starts the MCP server if you wa
 | --- | --- | --- |
 | `LM_WEB_MCP_FETCH_TIMEOUT_MS` | `20000` | Per-request fetch timeout in milliseconds. |
 | `LM_WEB_MCP_DEFAULT_MAX_CONTENT_CHARS` | `12000` | Default maximum page text returned by `web_fetch`. |
+| `LM_WEB_MCP_DEFAULT_MAX_TRANSCRIPT_CHARS` | `0` | Default maximum YouTube transcript text returned by `youtube_transcript`; `0` means return the full transcript. |
+| `LM_WEB_MCP_MAX_YOUTUBE_TRANSCRIPT_CHARS` | `1000000` | Highest `maxChars` value accepted by `youtube_transcript` when a limit is requested. |
 | `LM_WEB_MCP_MAX_DOWNLOAD_BYTES` | `5000000` | Maximum response size the server will download. |
 | `LM_WEB_MCP_DEFAULT_QR_WIDTH` | `768` | Default generated QR PNG width and height in pixels. |
 | `LM_WEB_MCP_MAX_QR_TEXT_CHARS` | `4000` | Maximum text length accepted by `qr_generate`. |
